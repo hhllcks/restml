@@ -99,7 +99,7 @@ MODEL_INPUT_DEPTH = 3
 JPEG_DATA_TENSOR_NAME = 'DecodeJpeg/contents:0'
 RESIZED_INPUT_TENSOR_NAME = 'ResizeBilinear:0'
 
-class inceptionRetrainer:
+class InceptionRetrainer:
 
     def __init__(self,
                  image_dir,
