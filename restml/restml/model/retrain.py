@@ -82,74 +82,7 @@ from tensorflow.python.framework import tensor_shape
 from tensorflow.python.platform import gfile
 from tensorflow.python.util import compat
 
-
 import struct
-
-FLAGS = tf.app.flags.FLAGS
-
-# Input and output file flags.
-tf.app.flags.DEFINE_string('image_dir', '',
-                           """Path to folders of labeled images.""")
-tf.app.flags.DEFINE_string('output_graph', '/tmp/output_graph.pb',
-                           """Where to save the trained graph.""")
-tf.app.flags.DEFINE_string('output_labels', '/tmp/output_labels.txt',
-                           """Where to save the trained graph's labels.""")
-tf.app.flags.DEFINE_string('summaries_dir', '/tmp/retrain_logs',
-                          """Where to save summary logs for TensorBoard.""")
-
-# Details of the training configuration.
-tf.app.flags.DEFINE_integer('how_many_training_steps', 4000,
-                            """How many training steps to run before ending.""")
-tf.app.flags.DEFINE_float('learning_rate', 0.01,
-                          """How large a learning rate to use when training.""")
-tf.app.flags.DEFINE_integer(
-    'testing_percentage', 10,
-    """What percentage of images to use as a test set.""")
-tf.app.flags.DEFINE_integer(
-    'validation_percentage', 10,
-    """What percentage of images to use as a validation set.""")
-tf.app.flags.DEFINE_integer('eval_step_interval', 10,
-                            """How often to evaluate the training results.""")
-tf.app.flags.DEFINE_integer('train_batch_size', 100,
-                            """How many images to train on at a time.""")
-tf.app.flags.DEFINE_integer('test_batch_size', 500,
-                            """How many images to test on at a time. This"""
-                            """ test set is only used infrequently to verify"""
-                            """ the overall accuracy of the model.""")
-tf.app.flags.DEFINE_integer(
-    'validation_batch_size', 100,
-    """How many images to use in an evaluation batch. This validation set is"""
-    """ used much more often than the test set, and is an early indicator of"""
-    """ how accurate the model is during training.""")
-
-# File-system cache locations.
-tf.app.flags.DEFINE_string('model_dir', '/tmp/imagenet',
-                           """Path to classify_image_graph_def.pb, """
-                           """imagenet_synset_to_human_label_map.txt, and """
-                           """imagenet_2012_challenge_label_map_proto.pbtxt.""")
-tf.app.flags.DEFINE_string(
-    'bottleneck_dir', '/tmp/bottleneck',
-    """Path to cache bottleneck layer values as files.""")
-tf.app.flags.DEFINE_string('final_tensor_name', 'final_result',
-                           """The name of the output classification layer in"""
-                           """ the retrained graph.""")
-
-# Controls the distortions used during training.
-tf.app.flags.DEFINE_boolean(
-    'flip_left_right', False,
-    """Whether to randomly flip half of the training images horizontally.""")
-tf.app.flags.DEFINE_integer(
-    'random_crop', 0,
-    """A percentage determining how much of a margin to randomly crop off the"""
-    """ training images.""")
-tf.app.flags.DEFINE_integer(
-    'random_scale', 0,
-    """A percentage determining how much to randomly scale up the size of the"""
-    """ training images by.""")
-tf.app.flags.DEFINE_integer(
-    'random_brightness', 0,
-    """A percentage determining how much to randomly multiply the training"""
-    """ image input pixels up or down by.""")
 
 # These are all parameters that are tied to the particular model architecture
 # we're using for Inception v3. These include things like tensor names and their
@@ -165,7 +98,6 @@ MODEL_INPUT_HEIGHT = 299
 MODEL_INPUT_DEPTH = 3
 JPEG_DATA_TENSOR_NAME = 'DecodeJpeg/contents:0'
 RESIZED_INPUT_TENSOR_NAME = 'ResizeBilinear:0'
-
 
 class inceptionRetrainer:
 
@@ -336,7 +268,7 @@ class inceptionRetrainer:
       Returns:
         File system path string to an image that meets the requested parameters.
       """
-      return get_image_path(image_lists, label_name, index, bottleneck_dir,
+      return self.get_image_path(image_lists, label_name, index, bottleneck_dir,
                             category) + '.txt'
     
     
@@ -349,7 +281,7 @@ class inceptionRetrainer:
       """
       with tf.Session() as sess:
         model_filename = os.path.join(
-            FLAGS.model_dir, 'classify_image_graph_def.pb')
+            self.model_dir, 'classify_image_graph_def.pb')
         with gfile.FastGFile(model_filename, 'rb') as f:
           graph_def = tf.GraphDef()
           graph_def.ParseFromString(f.read())
@@ -386,7 +318,7 @@ class inceptionRetrainer:
       If the pretrained model we're using doesn't already exist, this function
       downloads it from the TensorFlow.org website and unpacks it into a directory.
       """
-      dest_directory = FLAGS.model_dir
+      dest_directory = self.model_dir
       if not os.path.exists(dest_directory):
         os.makedirs(dest_directory)
       filename = DATA_URL.split('/')[-1]
@@ -478,8 +410,8 @@ class inceptionRetrainer:
       label_lists = image_lists[label_name]
       sub_dir = label_lists['dir']
       sub_dir_path = os.path.join(bottleneck_dir, sub_dir)
-      ensure_dir_exists(sub_dir_path)
-      bottleneck_path = get_bottleneck_path(image_lists, label_name, index,
+      self.ensure_dir_exists(sub_dir_path)
+      bottleneck_path = self.get_bottleneck_path(image_lists, label_name, index,
                                             bottleneck_dir, category)
       if not os.path.exists(bottleneck_path):
         print('Creating bottleneck at ' + bottleneck_path)
@@ -525,12 +457,12 @@ class inceptionRetrainer:
         Nothing.
       """
       how_many_bottlenecks = 0
-      ensure_dir_exists(bottleneck_dir)
+      self.ensure_dir_exists(bottleneck_dir)
       for label_name, label_lists in image_lists.items():
         for category in ['training', 'testing', 'validation']:
           category_list = label_lists[category]
           for index, unused_base_name in enumerate(category_list):
-            get_or_create_bottleneck(sess, image_lists, label_name, index,
+            self.get_or_create_bottleneck(sess, image_lists, label_name, index,
                                      image_dir, category, bottleneck_dir,
                                      jpeg_data_tensor, bottleneck_tensor)
             how_many_bottlenecks += 1
@@ -569,7 +501,7 @@ class inceptionRetrainer:
         label_index = random.randrange(class_count)
         label_name = list(image_lists.keys())[label_index]
         image_index = random.randrange(65536)
-        bottleneck = get_or_create_bottleneck(sess, image_lists, label_name,
+        bottleneck = self.get_or_create_bottleneck(sess, image_lists, label_name,
                                               image_index, image_dir, category,
                                               bottleneck_dir, jpeg_data_tensor,
                                               bottleneck_tensor)
@@ -789,10 +721,10 @@ class inceptionRetrainer:
       with tf.name_scope(layer_name):
         with tf.name_scope('weights'):
           layer_weights = tf.Variable(tf.truncated_normal([BOTTLENECK_TENSOR_SIZE, class_count], stddev=0.001), name='final_weights')
-          variable_summaries(layer_weights, layer_name + '/weights')
+          self.variable_summaries(layer_weights, layer_name + '/weights')
         with tf.name_scope('biases'):
           layer_biases = tf.Variable(tf.zeros([class_count]), name='final_biases')
-          variable_summaries(layer_biases, layer_name + '/biases')
+          self.variable_summaries(layer_biases, layer_name + '/biases')
         with tf.name_scope('Wx_plus_b'):
           logits = tf.matmul(bottleneck_input, layer_weights) + layer_biases
           tf.histogram_summary(layer_name + '/pre_activations', logits)
@@ -808,7 +740,7 @@ class inceptionRetrainer:
         tf.scalar_summary('cross entropy', cross_entropy_mean)
     
       with tf.name_scope('train'):
-        train_step = tf.train.GradientDescentOptimizer(FLAGS.learning_rate).minimize(
+        train_step = tf.train.GradientDescentOptimizer(self.learning_rate).minimize(
             cross_entropy_mean)
     
       return (train_step, cross_entropy_mean, bottleneck_input, ground_truth_input,
@@ -838,76 +770,76 @@ class inceptionRetrainer:
     
     def retrain(self):
       # Setup the directory we'll write summaries to for TensorBoard
-      if tf.gfile.Exists(FLAGS.summaries_dir):
-        tf.gfile.DeleteRecursively(FLAGS.summaries_dir)
-      tf.gfile.MakeDirs(FLAGS.summaries_dir)
+      if tf.gfile.Exists(self.summaries_dir):
+        tf.gfile.DeleteRecursively(self.summaries_dir)
+      tf.gfile.MakeDirs(self.summaries_dir)
     
       # Set up the pre-trained graph.
-      maybe_download_and_extract()
+      self.maybe_download_and_extract()
       graph, bottleneck_tensor, jpeg_data_tensor, resized_image_tensor = (
-          create_inception_graph())
+          self.create_inception_graph())
     
       # Look at the folder structure, and create lists of all the images.
-      image_lists = create_image_lists(FLAGS.image_dir, FLAGS.testing_percentage,
-                                       FLAGS.validation_percentage)
+      image_lists = self.create_image_lists(self.image_dir, self.testing_percentage,
+                                       self.validation_percentage)
       class_count = len(image_lists.keys())
       if class_count == 0:
-        print('No valid folders of images found at ' + FLAGS.image_dir)
+        print('No valid folders of images found at ' + self.image_dir)
         return -1
       if class_count == 1:
-        print('Only one valid folder of images found at ' + FLAGS.image_dir +
+        print('Only one valid folder of images found at ' + self.image_dir +
               ' - multiple classes are needed for classification.')
         return -1
     
       # See if the command-line flags mean we're applying any distortions.
-      do_distort_images = should_distort_images(
-          FLAGS.flip_left_right, FLAGS.random_crop, FLAGS.random_scale,
-          FLAGS.random_brightness)
+      do_distort_images = self.should_distort_images(
+          self.flip_left_right, self.random_crop, self.random_scale,
+          self.random_brightness)
       sess = tf.Session()
     
       if do_distort_images:
         # We will be applying distortions, so setup the operations we'll need.
-        distorted_jpeg_data_tensor, distorted_image_tensor = add_input_distortions(
-            FLAGS.flip_left_right, FLAGS.random_crop, FLAGS.random_scale,
-            FLAGS.random_brightness)
+        distorted_jpeg_data_tensor, distorted_image_tensor = self.add_input_distortions(
+            self.flip_left_right, self.random_crop, self.random_scale,
+            self.random_brightness)
       else:
         # We'll make sure we've calculated the 'bottleneck' image summaries and
         # cached them on disk.
-        cache_bottlenecks(sess, image_lists, FLAGS.image_dir, FLAGS.bottleneck_dir,
+        self.cache_bottlenecks(sess, image_lists, self.image_dir, self.bottleneck_dir,
                           jpeg_data_tensor, bottleneck_tensor)
     
       # Add the new layer that we'll be training.
       (train_step, cross_entropy, bottleneck_input, ground_truth_input,
-       final_tensor) = add_final_training_ops(len(image_lists.keys()),
-                                              FLAGS.final_tensor_name,
+       final_tensor) = self.add_final_training_ops(len(image_lists.keys()),
+                                              self.final_tensor_name,
                                               bottleneck_tensor)
     
       # Create the operations we need to evaluate the accuracy of our new layer.
-      evaluation_step = add_evaluation_step(final_tensor, ground_truth_input)
+      evaluation_step = self.add_evaluation_step(final_tensor, ground_truth_input)
     
       # Merge all the summaries and write them out to /tmp/retrain_logs (by default)
       merged = tf.merge_all_summaries()
-      train_writer = tf.train.SummaryWriter(FLAGS.summaries_dir + '/train',
+      train_writer = tf.train.SummaryWriter(self.summaries_dir + '/train',
                                             sess.graph)
-      validation_writer = tf.train.SummaryWriter(FLAGS.summaries_dir + '/validation')
+      validation_writer = tf.train.SummaryWriter(self.summaries_dir + '/validation')
     
       # Set up all our weights to their initial default values.
       init = tf.initialize_all_variables()
       sess.run(init)
     
       # Run the training for as many cycles as requested on the command line.
-      for i in range(FLAGS.how_many_training_steps):
+      for i in range(self.how_many_training_steps):
         # Get a batch of input bottleneck values, either calculated fresh every time
         # with distortions applied, or from the cache stored on disk.
         if do_distort_images:
-          train_bottlenecks, train_ground_truth = get_random_distorted_bottlenecks(
-              sess, image_lists, FLAGS.train_batch_size, 'training',
-              FLAGS.image_dir, distorted_jpeg_data_tensor,
+          train_bottlenecks, train_ground_truth = self.get_random_distorted_bottlenecks(
+              sess, image_lists, self.train_batch_size, 'training',
+              self.image_dir, distorted_jpeg_data_tensor,
               distorted_image_tensor, resized_image_tensor, bottleneck_tensor)
         else:
-          train_bottlenecks, train_ground_truth = get_random_cached_bottlenecks(
-              sess, image_lists, FLAGS.train_batch_size, 'training',
-              FLAGS.bottleneck_dir, FLAGS.image_dir, jpeg_data_tensor,
+          train_bottlenecks, train_ground_truth = self.get_random_cached_bottlenecks(
+              sess, image_lists, self.train_batch_size, 'training',
+              self.bottleneck_dir, self.image_dir, jpeg_data_tensor,
               bottleneck_tensor)
         # Feed the bottlenecks and ground truth into the graph, and run a training
         # step. Capture training summaries for TensorBoard with the `merged` op.
@@ -917,8 +849,8 @@ class inceptionRetrainer:
         train_writer.add_summary(train_summary, i)
     
         # Every so often, print out how well the graph is training.
-        is_last_step = (i + 1 == FLAGS.how_many_training_steps)
-        if (i % FLAGS.eval_step_interval) == 0 or is_last_step:
+        is_last_step = (i + 1 == self.how_many_training_steps)
+        if (i % self.eval_step_interval) == 0 or is_last_step:
           train_accuracy, cross_entropy_value = sess.run(
               [evaluation_step, cross_entropy],
               feed_dict={bottleneck_input: train_bottlenecks,
@@ -928,9 +860,9 @@ class inceptionRetrainer:
           print('%s: Step %d: Cross entropy = %f' % (datetime.now(), i,
                                                      cross_entropy_value))
           validation_bottlenecks, validation_ground_truth = (
-              get_random_cached_bottlenecks(
-                  sess, image_lists, FLAGS.validation_batch_size, 'validation',
-                  FLAGS.bottleneck_dir, FLAGS.image_dir, jpeg_data_tensor,
+              self.get_random_cached_bottlenecks(
+                  sess, image_lists, self.validation_batch_size, 'validation',
+                  self.bottleneck_dir, self.image_dir, jpeg_data_tensor,
                   bottleneck_tensor))
           # Run a validation step and capture training summaries for TensorBoard
           # with the `merged` op.
@@ -944,9 +876,9 @@ class inceptionRetrainer:
     
       # We've completed all our training, so run a final test evaluation on
       # some new images we haven't used before.
-      test_bottlenecks, test_ground_truth = get_random_cached_bottlenecks(
-          sess, image_lists, FLAGS.test_batch_size, 'testing',
-          FLAGS.bottleneck_dir, FLAGS.image_dir, jpeg_data_tensor,
+      test_bottlenecks, test_ground_truth = self.get_random_cached_bottlenecks(
+          sess, image_lists, self.test_batch_size, 'testing',
+          self.bottleneck_dir, self.image_dir, jpeg_data_tensor,
           bottleneck_tensor)
       test_accuracy = sess.run(
           evaluation_step,
@@ -956,8 +888,8 @@ class inceptionRetrainer:
     
       # Write out the trained graph and labels with the weights stored as constants.
       output_graph_def = graph_util.convert_variables_to_constants(
-          sess, graph.as_graph_def(), [FLAGS.final_tensor_name])
-      with gfile.FastGFile(FLAGS.output_graph, 'wb') as f:
+          sess, graph.as_graph_def(), [self.final_tensor_name])
+      with gfile.FastGFile(self.output_graph, 'wb') as f:
         f.write(output_graph_def.SerializeToString())
-      with gfile.FastGFile(FLAGS.output_labels, 'w') as f:
+      with gfile.FastGFile(self.output_labels, 'w') as f:
         f.write('\n'.join(image_lists.keys()) + '\n')
