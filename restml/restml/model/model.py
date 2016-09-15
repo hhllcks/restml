@@ -6,6 +6,8 @@ class RESTmlModel:
     def __init__(self, modeldata):
         self._modeldata = modeldata
         self._check = self.checkModeldata()
+        self._predictParameters = []
+        self.fillPredictParameters()
         
     @abstractmethod
     def fit(self):
@@ -25,5 +27,14 @@ class RESTmlModel:
     @abstractmethod
     def checkModeldata(self):
         raise NotImplementedError
+    
+    @abstractmethod
+    def getPredictParameters(self):
+        return self._predictParameters
+    
+    @abstractmethod
+    def fillPredictParameters(self):
+        raise NotImplementedError
+        
     
     

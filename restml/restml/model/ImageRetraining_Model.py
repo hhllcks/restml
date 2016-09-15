@@ -1,9 +1,21 @@
-from ImageRetraining import InceptionRetrainer
 import operator
+import json
 import tensorflow as tf
-from model import RESTmlModel
+from .model import RESTmlModel
+from .ImageRetraining import InceptionRetrainer
 
 class MdlImageRetraining(RESTmlModel):
+    def fillPredictParameters(self):
+        self._predictParameters.append({"name":"img",
+                                        "description":"the image file",
+                                        "in": "formData",
+                                        "type": "file",
+                                        "required": True})
+        self._predictParameters.append({"name":"img2",
+                                        "description":"a second image file",
+                                        "in": "formData",
+                                        "type": "file",
+                                        "required": True})
     
     def getType(self):
         return 'tf_img_retrain'
@@ -33,6 +45,7 @@ class MdlImageRetraining(RESTmlModel):
         labels_path = self.root_path + "/model/labels.txt"
         graph_path = self.root_path + "/model/graph.pb"
         results = []
+        result_temp = {}
         
         # Read in the image_data
         image_data = tf.gfile.FastGFile(image_path, 'rb').read()
@@ -58,12 +71,20 @@ class MdlImageRetraining(RESTmlModel):
             for node_id in top_k:
                 human_string = label_lines[node_id]
                 score = predictions[0][node_id]
-                results.append((human_string, score))
+                result_temp = {}
+                result_temp["class"] = human_string
+                result_temp["score"] = float(score) #'%.5f' % score
+                results.append(result_temp)
                 
             # Sort by percentage descending
-            results_sorted = sorted(results, key=operator.itemgetter(1)) 
-            results_sorted.reverse()
-            return results_sorted
+            #results_sorted = sorted(results, key=operator.itemgetter(1)) 
+            #results_sorted.reverse()
+            
+            # Return as JSON Object
+            print(results)
+            jsonResults = json.dumps(results)
+            print(jsonResults)
+            return jsonResults
     
     def fit(self):
         # call retrain script with the following parameters

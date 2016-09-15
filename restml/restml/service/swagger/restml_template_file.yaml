@@ -16,18 +16,14 @@ paths:
     post:
       # Describe this verb here. Note: you can use markdown
       summary: Predict
-      description: No description given
-      operationId: start.coolPredictionFunction
+      description: "{{description}}"
+      operationId: restml.service.service.predict
+      consumes:
+        - multipart/form-data
       produces:
         - application/json
       # This is an array of POST operation parameters:
       parameters:
-        # the input into the predict method
-        - name: imgpath
-          in: query
-          description: the image path
-          required: true
-          type: string
       # Expected responses for this operation:
       responses:
         # Response code
