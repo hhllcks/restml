@@ -1,0 +1,44 @@
+# This is a template for the RESTml service generator
+# Please do not change this template
+swagger: '2.0'
+
+# This is your document metadata
+info:
+  version: "0.0.1"
+  title: Image Retraining Service
+
+# Describe your paths here
+paths:
+  # This is a path endpoint. Change it.
+  /clf:
+    # This is a HTTP operation
+    post:
+      # Describe this verb here. Note: you can use markdown
+      description: With this operation you can classify an image. The return value will be an array of results in the form of (class, score). Score is the probability that the image shows a picture of the class.
+      # This is array of GET operation parameters:
+      parameters:
+        # An example parameter that is in query and is required
+        - name: size
+          in: formData
+          description: the image that will be classified
+          required: true
+          type: file
+      # Expected responses for this operation:
+      responses:
+        # Response code
+        200:
+          description: Successful response
+          # A schema describing your response object.
+          # Use JSON Schema format
+          schema:
+            title: ArrayOfResults
+            type: array
+            items:
+              title: Result
+              type: object
+              properties:
+                class:
+                  type: string
+                score:
+                  type: number
+                  format: double
